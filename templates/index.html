@@ -3,13 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ParkRun Dashboard</title>
+    <title>ParkRun Dashboard - {{ athlete_name }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>ParkRun Dashboard</h1>
-        <p>Welcome to your personal ParkRun results tracker!</p>
+        <header class="dashboard-header">
+            <h1>{{ athlete_name }} - Athlete ID: {{ athlete_id }}</h1>
+        </header>
+
+        <div class="dashboard-content">
+            <div class="chart-container">
+                {{ chart_html|safe }}
+            </div>
+        </div>
     </div>
 </body>
 </html>

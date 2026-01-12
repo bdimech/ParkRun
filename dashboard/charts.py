@@ -133,19 +133,21 @@ def create_results_chart(df):
     y_ticks = list(range(y_min, y_max + tick_interval, tick_interval))
     y_tick_labels = [format_seconds_to_mmss(t) for t in y_ticks]
 
-    # Add monthly dotted vertical lines
+    # Add dotted vertical lines for odd months only (Jan, Mar, May, Jul, Sep, Nov)
+    odd_months = [1, 3, 5, 7, 9, 11]
     shapes = []
     current_date = x_min
     while current_date <= x_max:
-        shapes.append(dict(
-            type='line',
-            x0=current_date,
-            x1=current_date,
-            y0=0,
-            y1=1,
-            yref='paper',
-            line=dict(color='lightgray', width=1, dash='dot')
-        ))
+        if current_date.month in odd_months:
+            shapes.append(dict(
+                type='line',
+                x0=current_date,
+                x1=current_date,
+                y0=0,
+                y1=1,
+                yref='paper',
+                line=dict(color='lightgray', width=1, dash='dot')
+            ))
         current_date += pd.DateOffset(months=1)
 
     # Update layout
@@ -190,9 +192,8 @@ def create_results_chart(df):
         height=600,
         margin=dict(l=80, b=100, r=250, t=60),
         legend=dict(
-            title='Race Location (Count)',
             yanchor='top',
-            y=0.98,
+            y=0.95,
             xanchor='left',
             x=1.02,
             bordercolor='black',
@@ -202,6 +203,41 @@ def create_results_chart(df):
             itemsizing='constant',
             tracegroupgap=8
         ),
+        updatemenus=[
+            dict(
+                type='buttons',
+                direction='right',
+                x=1.02,
+                y=-0.15,
+                xanchor='left',
+                buttons=[
+                    dict(
+                        label='All Results',
+                        method='relayout',
+                        args=[{'xaxis.range': [x_min, x_max],
+                               'yaxis.range': [y_min, y_max]}]
+                    ),
+                    dict(
+                        label='Golden Zone',
+                        method='relayout',
+                        args=[{'xaxis.range': ['2022-01-01', '2026-06-30'],
+                               'yaxis.range': [20*60, 30*60]}]
+                    )
+                ]
+            )
+        ],
+        annotations=[
+            dict(
+                text='<b>Race Location (Count)</b>',
+                x=1.02,
+                y=1.0,
+                xref='paper',
+                yref='paper',
+                xanchor='left',
+                showarrow=False,
+                font=dict(size=12)
+            )
+        ],
         shapes=shapes
     )
 

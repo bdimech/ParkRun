@@ -63,33 +63,36 @@ def create_results_chart(df):
         non_pb_df = event_df[~event_df['IsPB']]
         pb_df = event_df[event_df['IsPB']]
 
-        # Add non-PB points
-        fig.add_trace(go.Scatter(
-            x=non_pb_df['Date'],
-            y=non_pb_df['TimeSeconds'],
-            mode='markers',
-            name=f"{event} ({race_count})",
-            marker=dict(
-                size=8,
-                color=color,
-                symbol='circle',
-                line=dict(width=1, color='white')
-            ),
-            customdata=non_pb_df[['TimeFormatted', 'Position', 'AgeGrade']],
-            hovertemplate=(
-                '<b>%{fullData.name}</b><br>' +
-                'Date: %{x|%d/%m/%Y}<br>' +
-                'Time: %{customdata[0]}<br>' +
-                'Position: %{customdata[1]}<br>' +
-                'Age Grade: %{customdata[2]}<br>' +
-                '<extra></extra>'
-            ),
-            legendgroup=event,
-            showlegend=True
-        ))
+        # Add non-PB points (if any exist)
+        if not non_pb_df.empty:
+            fig.add_trace(go.Scatter(
+                x=non_pb_df['Date'],
+                y=non_pb_df['TimeSeconds'],
+                mode='markers',
+                name=f"{event} ({race_count})",
+                marker=dict(
+                    size=8,
+                    color=color,
+                    symbol='circle',
+                    line=dict(width=1, color='white')
+                ),
+                customdata=non_pb_df[['TimeFormatted', 'Position', 'AgeGrade']],
+                hovertemplate=(
+                    '<b>%{fullData.name}</b><br>' +
+                    'Date: %{x|%d/%m/%Y}<br>' +
+                    'Time: %{customdata[0]}<br>' +
+                    'Position: %{customdata[1]}<br>' +
+                    'Age Grade: %{customdata[2]}<br>' +
+                    '<extra></extra>'
+                ),
+                legendgroup=event,
+                showlegend=True
+            ))
 
         # Add PB points with star markers
         if not pb_df.empty:
+            # If there are no non-PB points, show this trace in legend
+            show_in_legend = non_pb_df.empty
             fig.add_trace(go.Scatter(
                 x=pb_df['Date'],
                 y=pb_df['TimeSeconds'],
@@ -112,7 +115,7 @@ def create_results_chart(df):
                     '<extra></extra>'
                 ),
                 legendgroup=event,
-                showlegend=False
+                showlegend=show_in_legend
             ))
 
     # Calculate dynamic axis ranges based on data
@@ -133,21 +136,22 @@ def create_results_chart(df):
     y_ticks = list(range(y_min, y_max + tick_interval, tick_interval))
     y_tick_labels = [format_seconds_to_mmss(t) for t in y_ticks]
 
-    # Add dotted vertical lines for odd months only (Jan, Mar, May, Jul, Sep, Nov)
-    odd_months = [1, 3, 5, 7, 9, 11]
+    # Add monthly dotted vertical lines - cover full Golden Zone range for toggle
     shapes = []
-    current_date = x_min
-    while current_date <= x_max:
-        if current_date.month in odd_months:
-            shapes.append(dict(
-                type='line',
-                x0=current_date,
-                x1=current_date,
-                y0=0,
-                y1=1,
-                yref='paper',
-                line=dict(color='lightgray', width=1, dash='dot')
-            ))
+    # Start from earliest possible date (Golden Zone start)
+    golden_start = pd.Timestamp('2022-01-01')
+    golden_end = pd.Timestamp('2026-06-30')
+    current_date = golden_start
+    while current_date <= golden_end:
+        shapes.append(dict(
+            type='line',
+            x0=current_date,
+            x1=current_date,
+            y0=0,
+            y1=1,
+            yref='paper',
+            line=dict(color='lightgray', width=1, dash='dot')
+        ))
         current_date += pd.DateOffset(months=1)
 
     # Update layout
@@ -206,10 +210,11 @@ def create_results_chart(df):
         updatemenus=[
             dict(
                 type='buttons',
-                direction='right',
+                direction='down',
                 x=1.02,
-                y=-0.15,
+                y=0.20,
                 xanchor='left',
+                yanchor='top',
                 buttons=[
                     dict(
                         label='All Results',
@@ -223,7 +228,10 @@ def create_results_chart(df):
                         args=[{'xaxis.range': ['2022-01-01', '2026-06-30'],
                                'yaxis.range': [20*60, 30*60]}]
                     )
-                ]
+                ],
+                bgcolor='lightgray',
+                bordercolor='black',
+                borderwidth=1
             )
         ],
         annotations=[

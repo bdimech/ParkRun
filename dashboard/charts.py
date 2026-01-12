@@ -115,25 +115,23 @@ def create_results_chart(df):
                 showlegend=False
             ))
 
-    # Create custom tick values and labels for y-axis
-    y_min = df['TimeSeconds'].min()
-    y_max = df['TimeSeconds'].max()
+    # Calculate dynamic axis ranges based on data
+    # X-axis: dates with padding
+    x_min = df['Date'].min() - pd.DateOffset(months=1)
+    x_max = df['Date'].max() + pd.DateOffset(months=1)
+
+    # Y-axis: times with padding
+    y_data_min = df['TimeSeconds'].min()
+    y_data_max = df['TimeSeconds'].max()
+
+    # Add padding to y-axis (round down to nearest minute for min, up for max)
     tick_interval = 60  # 1 minute intervals
-    y_ticks = list(range(int(y_min // tick_interval) * tick_interval,
-                         int(y_max // tick_interval + 1) * tick_interval + tick_interval,
-                         tick_interval))
+    y_min = int(y_data_min // tick_interval) * tick_interval - tick_interval
+    y_max = int(y_data_max // tick_interval + 1) * tick_interval + tick_interval
+
+    # Create tick values and labels for y-axis
+    y_ticks = list(range(y_min, y_max + tick_interval, tick_interval))
     y_tick_labels = [format_seconds_to_mmss(t) for t in y_ticks]
-
-    # Fixed axis ranges
-    x_min = pd.Timestamp('2022-01-01')
-    x_max = pd.Timestamp('2027-01-01')
-    y_min_fixed = 22 * 60  # 22 minutes in seconds
-    y_max_fixed = 30 * 60  # 30 minutes in seconds
-
-    # Create tick values for fixed y-axis range
-    tick_interval = 60  # 1 minute intervals
-    y_ticks_fixed = list(range(y_min_fixed, y_max_fixed + tick_interval, tick_interval))
-    y_tick_labels_fixed = [format_seconds_to_mmss(t) for t in y_ticks_fixed]
 
     # Add monthly dotted vertical lines
     shapes = []
@@ -176,13 +174,13 @@ def create_results_chart(df):
             showgrid=True,
             gridcolor='lightgray',
             tickmode='array',
-            tickvals=y_ticks_fixed,
-            ticktext=y_tick_labels_fixed,
+            tickvals=y_ticks,
+            ticktext=y_tick_labels,
             showline=True,
             linewidth=2,
             linecolor='black',
             mirror=True,
-            range=[y_min_fixed, y_max_fixed],
+            range=[y_min, y_max],
             fixedrange=True,
             tickfont=dict(size=10),
             title_standoff=15

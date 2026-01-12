@@ -6,15 +6,6 @@ bp = Blueprint('main', __name__)
 
 @bp.route('/')
 def index():
-    # Default to command-line setting
-    auto_update = current_app.config.get('AUTO_UPDATE', False)
-
-    # Allow URL parameter to override (e.g., ?no_update=1 or ?update=1)
-    if request.args.get('no_update') == '1':
-        auto_update = False
-    elif request.args.get('update') == '1':
-        auto_update = True
-
     # Load all athletes
     athletes_df = load_athletes_config()
 
@@ -25,8 +16,8 @@ def index():
     if selected_athlete_id is None and not athletes_df.empty:
         selected_athlete_id = str(athletes_df.iloc[0]['parkrun_id'])
 
-    # Load ParkRun data (optionally fetching latest from web)
-    df = load_parkrun_data(auto_update=auto_update)
+    # Load ParkRun data from cached CSV (web scraping happens at startup only)
+    df = load_parkrun_data(auto_update=False)
 
     # Filter data for selected athlete if AthleteID column exists
     if 'AthleteID' in df.columns and selected_athlete_id:

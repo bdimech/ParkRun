@@ -16,8 +16,22 @@ def create_app(auto_update=False):
                 template_folder=os.path.join(basedir, 'templates'),
                 static_folder=os.path.join(basedir, 'static'))
 
-    # Store auto_update setting in Flask config
-    app.config['AUTO_UPDATE'] = auto_update
+    # Perform web scraping once at startup if requested
+    if auto_update:
+        from dashboard.data_loader import update_results_from_web
+        import logging
+        logger = logging.getLogger(__name__)
+
+        logger.info("Fetching fresh data from ParkRun website...")
+        results_path = os.path.join(basedir, 'data', 'results.csv')
+        athletes_path = os.path.join(basedir, 'data', 'athletes.csv')
+
+        try:
+            update_results_from_web(results_path, athletes_path)
+            logger.info("Data update completed successfully")
+        except Exception as e:
+            logger.error(f"Failed to update from web: {e}")
+            logger.info("Continuing with cached data")
 
     from dashboard import routes
     app.register_blueprint(routes.bp)

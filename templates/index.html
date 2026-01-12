@@ -9,7 +9,21 @@
 <body>
     <div class="container">
         <header class="dashboard-header">
-            <h1>{{ athlete_name }} - Athlete ID: {{ athlete_id }}</h1>
+            <h1>ParkRun Dashboard</h1>
+
+            <div class="athlete-selector">
+                <label for="athlete-select">Select Athlete:</label>
+                <select id="athlete-select" onchange="window.location.href='?athlete_id=' + this.value">
+                    {% for athlete in athletes %}
+                    <option value="{{ athlete.parkrun_id }}"
+                            {% if athlete.parkrun_id|string == selected_athlete_id %}selected{% endif %}>
+                        {{ athlete.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <h2>{{ athlete_name }} - Athlete ID: {{ athlete_id }}</h2>
         </header>
 
         <div class="dashboard-content">

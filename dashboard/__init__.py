@@ -17,7 +17,8 @@ def create_app(auto_update=False):
                 static_folder=os.path.join(basedir, 'static'))
 
     # Perform web scraping once at startup if requested
-    if auto_update:
+    # Only run in main process, not in Flask's debug reloader process
+    if auto_update and not os.environ.get('WERKZEUG_RUN_MAIN'):
         from dashboard.data_loader import update_results_from_web
         import logging
         logger = logging.getLogger(__name__)

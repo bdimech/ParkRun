@@ -137,13 +137,19 @@ def update_results_from_web(results_path='data/results.csv', athletes_path='data
         new_df = pd.concat(all_new_results, ignore_index=True)
 
         if not existing_df.empty:
+            # Normalize Athlete ID to string for consistent deduplication
+            if 'Athlete ID' in existing_df.columns:
+                existing_df['Athlete ID'] = existing_df['Athlete ID'].astype(str)
+            if 'Athlete ID' in new_df.columns:
+                new_df['Athlete ID'] = new_df['Athlete ID'].astype(str)
+
             # Merge with existing data
             combined_df = pd.concat([existing_df, new_df], ignore_index=True)
 
-            # Remove duplicates based on Event and Run Date
-            # (Athlete ID may be empty in old data)
+            # Remove duplicates based on Event, Run Date, and Athlete ID
+            # Each athlete can have one result per event per date
             combined_df = combined_df.drop_duplicates(
-                subset=['Event', 'Run Date'],
+                subset=['Event', 'Run Date', 'Athlete ID'],
                 keep='last'
             )
         else:

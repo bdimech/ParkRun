@@ -54,68 +54,59 @@ def create_results_chart(df):
     # Create event to color mapping
     event_colors = {event: colors[i % len(colors)] for i, event in enumerate(events)}
 
+    # First pass: Add all results as colored dots
     for i, event in enumerate(events):
         event_df = df_sorted[df_sorted['Event'] == event]
         color = event_colors[event]
         race_count = len(event_df)
 
-        # Separate PB and non-PB races
-        non_pb_df = event_df[~event_df['IsPB']]
+        # Add all points as circles (show in legend)
+        fig.add_trace(go.Scatter(
+            x=event_df['Date'],
+            y=event_df['TimeSeconds'],
+            mode='markers',
+            name=f"{event} ({race_count})",
+            marker=dict(
+                size=8,
+                color=color,
+                symbol='circle',
+                line=dict(width=1, color='white')
+            ),
+            customdata=event_df[['TimeFormatted', 'Position', 'AgeGrade']],
+            hovertemplate=(
+                '<b>%{fullData.name}</b><br>' +
+                'Date: %{x|%d/%m/%Y}<br>' +
+                'Time: %{customdata[0]}<br>' +
+                'Position: %{customdata[1]}<br>' +
+                'Age Grade: %{customdata[2]}<br>' +
+                '<extra></extra>'
+            ),
+            legendgroup=event,
+            showlegend=True
+        ))
+
+    # Second pass: Add PB overlay stars (hidden by default, not in legend)
+    for i, event in enumerate(events):
+        event_df = df_sorted[df_sorted['Event'] == event]
+        color = event_colors[event]
         pb_df = event_df[event_df['IsPB']]
 
-        # Add non-PB points (if any exist)
-        if not non_pb_df.empty:
-            fig.add_trace(go.Scatter(
-                x=non_pb_df['Date'],
-                y=non_pb_df['TimeSeconds'],
-                mode='markers',
-                name=f"{event} ({race_count})",
-                marker=dict(
-                    size=8,
-                    color=color,
-                    symbol='circle',
-                    line=dict(width=1, color='white')
-                ),
-                customdata=non_pb_df[['TimeFormatted', 'Position', 'AgeGrade']],
-                hovertemplate=(
-                    '<b>%{fullData.name}</b><br>' +
-                    'Date: %{x|%d/%m/%Y}<br>' +
-                    'Time: %{customdata[0]}<br>' +
-                    'Position: %{customdata[1]}<br>' +
-                    'Age Grade: %{customdata[2]}<br>' +
-                    '<extra></extra>'
-                ),
-                legendgroup=event,
-                showlegend=True
-            ))
-
-        # Add PB points with star markers
         if not pb_df.empty:
-            # If there are no non-PB points, show this trace in legend
-            show_in_legend = non_pb_df.empty
             fig.add_trace(go.Scatter(
                 x=pb_df['Date'],
                 y=pb_df['TimeSeconds'],
                 mode='markers',
-                name=f"{event} ({race_count})",
+                name=f"{event} PB",
                 marker=dict(
                     size=14,
                     color=color,
                     symbol='star',
                     line=dict(width=2, color='gold')
                 ),
-                customdata=pb_df[['TimeFormatted', 'Position', 'AgeGrade']],
-                hovertemplate=(
-                    '<b>%{fullData.name}</b><br>' +
-                    'Date: %{x|%d/%m/%Y}<br>' +
-                    'Time: %{customdata[0]}<br>' +
-                    'Position: %{customdata[1]}<br>' +
-                    'Age Grade: %{customdata[2]}<br>' +
-                    '<b>Personal Best!</b><br>' +
-                    '<extra></extra>'
-                ),
                 legendgroup=event,
-                showlegend=show_in_legend
+                showlegend=False,
+                visible=False,  # Hidden by default
+                hoverinfo='skip'  # Don't show hover on PB stars
             ))
 
     # Calculate dynamic axis ranges based on data
@@ -153,6 +144,18 @@ def create_results_chart(df):
             line=dict(color='lightgray', width=1, dash='dot')
         ))
         current_date += pd.DateOffset(months=1)
+
+    # Calculate visibility arrays for PB toggle
+    # Location traces (circles) are always visible
+    num_events = len(events)
+    # Total traces = location circles + PB stars
+    total_traces = len(fig.data)
+
+    # Visibility when PBs are shown (all traces visible)
+    pb_show_visible = [True] * total_traces
+
+    # Visibility when PBs are hidden (only location traces visible)
+    pb_hide_visible = [True] * num_events + [False] * (total_traces - num_events)
 
     # Update layout
     fig.update_layout(
@@ -208,9 +211,11 @@ def create_results_chart(df):
             tracegroupgap=8
         ),
         updatemenus=[
+            # View toggle (All Results / Golden Zone)
             dict(
                 type='buttons',
                 direction='down',
+                active=0,  # Highlight "All Results" by default
                 x=1.02,
                 y=0.20,
                 xanchor='left',
@@ -227,6 +232,31 @@ def create_results_chart(df):
                         method='relayout',
                         args=[{'xaxis.range': ['2022-01-01', '2026-06-30'],
                                'yaxis.range': [20*60, 30*60]}]
+                    )
+                ],
+                bgcolor='lightgray',
+                bordercolor='black',
+                borderwidth=1
+            ),
+            # PB toggle (Show / Hide)
+            dict(
+                type='buttons',
+                direction='down',
+                active=0,  # Highlight "Hide PBs" by default
+                x=1.02,
+                y=-0.05,
+                xanchor='left',
+                yanchor='top',
+                buttons=[
+                    dict(
+                        label='Hide PBs',
+                        method='update',
+                        args=[{'visible': pb_hide_visible}]
+                    ),
+                    dict(
+                        label='Show PBs',
+                        method='update',
+                        args=[{'visible': pb_show_visible}]
                     )
                 ],
                 bgcolor='lightgray',

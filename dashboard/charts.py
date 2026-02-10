@@ -41,9 +41,10 @@ def create_results_chart(df):
     df_sorted['IsPB'] = False
     df_sorted.loc[pb_indices, 'IsPB'] = True
 
-    # Get events ordered by race count (highest first)
+    # Get events ordered by race count (highest first), then alphabetically
     event_counts = df_sorted['Event'].value_counts()
-    events = event_counts.index.tolist()
+    # Sort by count descending, then by event name alphabetically
+    events = sorted(event_counts.index, key=lambda x: (-event_counts[x], x))
 
     # Color palette for different events
     colors = [
@@ -123,17 +124,25 @@ def create_results_chart(df):
     y_min = int(y_data_min // tick_interval) * tick_interval - tick_interval
     y_max = int(y_data_max // tick_interval + 1) * tick_interval + tick_interval
 
-    # Create tick values and labels for y-axis
-    y_ticks = list(range(y_min, y_max + tick_interval, tick_interval))
+    # Extend range to cover Golden Zone (20-30 minutes) if needed
+    golden_zone_min = 20 * 60
+    golden_zone_max = 30 * 60
+    y_min_extended = min(y_min, golden_zone_min)
+    y_max_extended = max(y_max, golden_zone_max)
+
+    # Create tick values and labels for y-axis covering full possible range
+    y_ticks = list(range(y_min_extended, y_max_extended + tick_interval, tick_interval))
     y_tick_labels = [format_seconds_to_mmss(t) for t in y_ticks]
 
-    # Add monthly dotted vertical lines - cover full Golden Zone range for toggle
+    # Add monthly dotted vertical lines - use paper coordinates so they adapt to zoom
     shapes = []
-    # Start from earliest possible date (Golden Zone start)
-    golden_start = pd.Timestamp('2022-01-01')
+    # Start from the beginning of the month containing the earliest data
+    line_start = pd.Timestamp(x_min.year, x_min.month, 1)
+    # End at the last month of data (or Golden Zone end if later)
     golden_end = pd.Timestamp('2026-06-30')
-    current_date = golden_start
-    while current_date <= golden_end:
+    line_end = max(x_max, golden_end)
+    current_date = line_start
+    while current_date <= line_end:
         shapes.append(dict(
             type='line',
             x0=current_date,
@@ -214,10 +223,10 @@ def create_results_chart(df):
             # View toggle (All Results / Golden Zone)
             dict(
                 type='buttons',
-                direction='down',
+                direction='right',
                 active=0,  # Highlight "All Results" by default
-                x=1.02,
-                y=0.20,
+                x=0.12,
+                y=-0.15,
                 xanchor='left',
                 yanchor='top',
                 buttons=[
@@ -241,10 +250,10 @@ def create_results_chart(df):
             # PB toggle (Show / Hide)
             dict(
                 type='buttons',
-                direction='down',
+                direction='right',
                 active=0,  # Highlight "Hide PBs" by default
-                x=1.02,
-                y=-0.05,
+                x=0.72,
+                y=-0.15,
                 xanchor='left',
                 yanchor='top',
                 buttons=[

@@ -290,3 +290,108 @@ def create_results_chart(df):
 
     # Convert to HTML
     return fig.to_html(full_html=False, include_plotlyjs='cdn')
+
+
+def create_location_map(df, locations_df):
+    """
+    Create an interactive map of ParkRun race locations with statistics.
+
+    Args:
+        df: Results DataFrame (Event, Date, TimeSeconds, TimeFormatted, etc.)
+        locations_df: Location coordinates (Event, Latitude, Longitude)
+
+    Returns:
+        str: HTML div containing the Plotly map
+    """
+    # 1. Aggregate stats per location
+    stats_df = df.groupby('Event').agg({
+        'TimeSeconds': ['count', 'min', 'mean'],
+        'Date': 'max'
+    }).reset_index()
+
+    # Flatten multi-level columns
+    stats_df.columns = ['Event', 'RaceCount', 'BestTime', 'AvgTime', 'LatestDate']
+
+    # 2. Format times for display
+    stats_df['BestTimeFormatted'] = stats_df['BestTime'].apply(format_seconds_to_mmss)
+    stats_df['AvgTimeFormatted'] = stats_df['AvgTime'].apply(lambda x: format_seconds_to_mmss(int(x)))
+
+    # 3. Join with location coordinates
+    map_df = stats_df.merge(locations_df, on='Event', how='left')
+
+    # 4. Handle missing locations
+    missing_locations = map_df[map_df['Latitude'].isna()]
+    if not missing_locations.empty:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Missing coordinates for: {missing_locations['Event'].tolist()}")
+
+    # Drop rows without coordinates
+    map_df = map_df.dropna(subset=['Latitude', 'Longitude'])
+
+    if map_df.empty:
+        return '<div class="no-results">No location data available for mapping.</div>'
+
+    # 5. Calculate marker sizes (proportional to race count)
+    max_count = map_df['RaceCount'].max()
+    map_df['MarkerSize'] = 10 + (map_df['RaceCount'] / max_count) * 20
+
+    # 6. Calculate map center
+    center_lat = map_df['Latitude'].mean()
+    center_lon = map_df['Longitude'].mean()
+
+    # 7. Create Scattermapbox figure
+    fig = go.Figure()
+
+    fig.add_trace(go.Scattermapbox(
+        lat=map_df['Latitude'],
+        lon=map_df['Longitude'],
+        mode='markers',
+        marker=dict(
+            size=map_df['MarkerSize'],
+            color=map_df['AvgTime'],
+            colorscale='RdYlBu_r',  # Red=slow, Blue=fast
+            opacity=0.7,
+            line=dict(width=1, color='white'),
+            showscale=True,
+            colorbar=dict(
+                title='Avg Time',
+                tickvals=[map_df['AvgTime'].min(), map_df['AvgTime'].mean(), map_df['AvgTime'].max()],
+                ticktext=[
+                    format_seconds_to_mmss(int(map_df['AvgTime'].min())),
+                    format_seconds_to_mmss(int(map_df['AvgTime'].mean())),
+                    format_seconds_to_mmss(int(map_df['AvgTime'].max()))
+                ]
+            )
+        ),
+        text=map_df['Event'],
+        customdata=map_df[['RaceCount', 'BestTimeFormatted', 'AvgTimeFormatted', 'LatestDate']],
+        hovertemplate=(
+            '<b>%{text}</b><br><br>' +
+            'Races: %{customdata[0]}<br>' +
+            'Best Time: %{customdata[1]}<br>' +
+            'Avg Time: %{customdata[2]}<br>' +
+            'Last Race: %{customdata[3]|%d/%m/%Y}<br>' +
+            '<extra></extra>'
+        )
+    ))
+
+    # 8. Configure map layout
+    fig.update_layout(
+        title=dict(
+            text='ParkRun Race Locations',
+            x=0.5,
+            xanchor='center'
+        ),
+        mapbox=dict(
+            style='open-street-map',
+            center=dict(lat=center_lat, lon=center_lon),
+            zoom=5
+        ),
+        height=600,
+        margin=dict(l=0, r=0, t=40, b=0),
+        hovermode='closest'
+    )
+
+    # Convert to HTML
+    return fig.to_html(full_html=False, include_plotlyjs='cdn')

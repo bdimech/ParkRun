@@ -159,6 +159,16 @@ def update_results_from_web(results_path='data/results.csv', athletes_path='data
         combined_df.to_csv(results_path, index=False)
         logger.info(f"Saved {len(combined_df)} total results to {results_path}")
 
+        # Geocode any new locations
+        if update_successful:
+            try:
+                new_count = geocode_new_locations(combined_df)
+                if new_count > 0:
+                    logger.info(f"Geocoded {new_count} new race locations")
+            except Exception as e:
+                logger.error(f"Failed to geocode new locations: {e}")
+                # Don't fail the entire update if geocoding fails
+
     return update_successful
 
 
@@ -267,3 +277,94 @@ def get_athlete_info(df):
         'name': 'Athlete',
         'id': 'TBD'
     }
+
+
+def load_location_data(csv_path='data/parkrun_locations.csv'):
+    """
+    Load ParkRun location coordinates from CSV.
+
+    Args:
+        csv_path: Path to locations CSV file
+
+    Returns:
+        pandas.DataFrame: Location data with columns Event, Latitude, Longitude
+    """
+    if not os.path.exists(csv_path):
+        logger.warning(f"Location data not found: {csv_path}")
+        return pd.DataFrame(columns=['Event', 'Latitude', 'Longitude', 'State'])
+
+    return pd.read_csv(csv_path)
+
+
+def geocode_new_locations(results_df, locations_csv='data/parkrun_locations.csv'):
+    """
+    Geocode any new event locations found in results that aren't in locations file.
+    Appends new coordinates to the CSV file.
+
+    Args:
+        results_df: DataFrame with Event column from scraped results
+        locations_csv: Path to locations CSV file
+
+    Returns:
+        int: Number of new locations geocoded
+    """
+    # 1. Get unique events from results
+    unique_events = results_df['Event'].unique()
+
+    # 2. Load existing locations (or create empty if missing)
+    if os.path.exists(locations_csv):
+        existing_locations = pd.read_csv(locations_csv)
+        existing_events = set(existing_locations['Event'].values)
+    else:
+        existing_locations = pd.DataFrame(columns=['Event', 'Latitude', 'Longitude', 'State'])
+        existing_events = set()
+
+    # 3. Find new events that need geocoding
+    new_events = set(unique_events) - existing_events
+
+    if not new_events:
+        logger.info("No new locations to geocode")
+        return 0
+
+    logger.info(f"Geocoding {len(new_events)} new locations: {new_events}")
+
+    # 4. Geocode new events
+    from geopy.geocoders import Nominatim
+    from geopy.exc import GeocoderTimedOut, GeocoderServiceError
+    import time
+
+    geolocator = Nominatim(user_agent="parkrun_dashboard")
+    new_rows = []
+
+    for event in new_events:
+        try:
+            # Search for "parkrun [event name], Australia"
+            query = f"parkrun {event}, Australia"
+            location = geolocator.geocode(query, timeout=10)
+
+            if location:
+                new_rows.append({
+                    'Event': event,
+                    'Latitude': location.latitude,
+                    'Longitude': location.longitude,
+                    'State': ''  # Can be filled manually later
+                })
+                logger.info(f"Geocoded {event}: ({location.latitude}, {location.longitude})")
+            else:
+                logger.warning(f"Could not geocode: {event}")
+
+            # Rate limit: wait 1 second between requests (Nominatim requirement)
+            time.sleep(1)
+
+        except (GeocoderTimedOut, GeocoderServiceError) as e:
+            logger.error(f"Geocoding error for {event}: {e}")
+            continue
+
+    # 5. Append new locations to CSV
+    if new_rows:
+        new_df = pd.DataFrame(new_rows)
+        updated_df = pd.concat([existing_locations, new_df], ignore_index=True)
+        updated_df.to_csv(locations_csv, index=False)
+        logger.info(f"Added {len(new_rows)} new locations to {locations_csv}")
+
+    return len(new_rows)

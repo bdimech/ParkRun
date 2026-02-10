@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, current_app
-from dashboard.data_loader import load_parkrun_data, get_athlete_info, load_athletes_config
-from dashboard.charts import create_results_chart
+from dashboard.data_loader import load_parkrun_data, get_athlete_info, load_athletes_config, load_location_data
+from dashboard.charts import create_results_chart, create_location_map
 
 bp = Blueprint('main', __name__)
 
@@ -36,13 +36,22 @@ def index():
     # Check if there are any results
     if df.empty:
         chart_html = '<div class="no-results">No results available for this athlete.</div>'
+        map_html = ''
     else:
         # Create chart
         chart_html = create_results_chart(df)
+
+        # Create map
+        locations_df = load_location_data()
+        if not locations_df.empty:
+            map_html = create_location_map(df, locations_df)
+        else:
+            map_html = '<div class="no-results">Location data not available for map display.</div>'
 
     return render_template('index.html',
                           athlete_name=athlete_info['name'],
                           athlete_id=athlete_info['id'],
                           athletes=athletes_df.to_dict('records'),
                           selected_athlete_id=selected_athlete_id,
-                          chart_html=chart_html)
+                          chart_html=chart_html,
+                          map_html=map_html)

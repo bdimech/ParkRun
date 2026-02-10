@@ -89,3 +89,19 @@ h1 {
     border-radius: 8px;
     border: 2px dashed #ddd;
 }
+
+/* Map container styling */
+.map-container {
+    width: 100%;
+    min-height: 600px;
+    margin-top: 30px;
+}
+
+/* Optional visual separator between chart and map */
+.chart-container::after {
+    content: '';
+    display: block;
+    height: 1px;
+    background: linear-gradient(to right, transparent, #ddd, transparent);
+    margin: 30px 0;
+}

@@ -299,6 +299,7 @@ def load_location_data(csv_path='data/parkrun_locations.csv'):
 def geocode_new_locations(results_df, locations_csv='data/parkrun_locations.csv'):
     """
     Geocode any new event locations found in results that aren't in locations file.
+    Scrapes coordinates from parkrun.com.au event pages (geo.position meta tag).
     Appends new coordinates to the CSV file.
 
     Args:
@@ -328,36 +329,62 @@ def geocode_new_locations(results_df, locations_csv='data/parkrun_locations.csv'
 
     logger.info(f"Geocoding {len(new_events)} new locations: {new_events}")
 
-    # 4. Geocode new events
-    from geopy.geocoders import Nominatim
-    from geopy.exc import GeocoderTimedOut, GeocoderServiceError
+    # 4. Geocode new events by scraping parkrun website
+    import requests
+    from bs4 import BeautifulSoup
     import time
 
-    geolocator = Nominatim(user_agent="parkrun_dashboard")
     new_rows = []
 
     for event in new_events:
         try:
-            # Search for "parkrun [event name], Australia"
-            query = f"parkrun {event}, Australia"
-            location = geolocator.geocode(query, timeout=10)
+            # Convert event name to parkrun URL slug (lowercase, remove spaces and commas)
+            url_slug = event.lower().replace(' ', '').replace(',', '')
+            parkrun_url = f"https://www.parkrun.com.au/{url_slug}/"
 
-            if location:
-                new_rows.append({
-                    'Event': event,
-                    'Latitude': location.latitude,
-                    'Longitude': location.longitude,
-                    'State': ''  # Can be filled manually later
-                })
-                logger.info(f"Geocoded {event}: ({location.latitude}, {location.longitude})")
+            # Fetch the parkrun page
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            response = requests.get(parkrun_url, headers=headers, timeout=10)
+
+            if response.status_code == 200:
+                # Parse HTML to find geo.position meta tag
+                soup = BeautifulSoup(response.text, 'html.parser')
+                geo_tag = soup.find('meta', attrs={'name': 'geo.position'})
+
+                if geo_tag and geo_tag.get('content'):
+                    # Extract coordinates (format: "latitude;longitude")
+                    coords = geo_tag['content'].split(';')
+                    if len(coords) == 2:
+                        latitude = float(coords[0])
+                        longitude = float(coords[1])
+
+                        new_rows.append({
+                            'Event': event,
+                            'Latitude': latitude,
+                            'Longitude': longitude,
+                            'State': ''  # Can be filled manually later
+                        })
+                        logger.info(f"Geocoded {event}: ({latitude}, {longitude})")
+                    else:
+                        logger.warning(f"Could not parse coordinates for: {event}")
+                else:
+                    logger.warning(f"No geo.position meta tag found for: {event}")
             else:
-                logger.warning(f"Could not geocode: {event}")
+                logger.warning(f"Failed to fetch parkrun page for {event} (status: {response.status_code})")
 
-            # Rate limit: wait 1 second between requests (Nominatim requirement)
+            # Rate limit: wait 1 second between requests (be nice to parkrun.com)
             time.sleep(1)
 
-        except (GeocoderTimedOut, GeocoderServiceError) as e:
-            logger.error(f"Geocoding error for {event}: {e}")
+        except requests.RequestException as e:
+            logger.error(f"Network error fetching coordinates for {event}: {e}")
+            continue
+        except (ValueError, IndexError) as e:
+            logger.error(f"Error parsing coordinates for {event}: {e}")
+            continue
+        except Exception as e:
+            logger.error(f"Unexpected error geocoding {event}: {e}")
             continue
 
     # 5. Append new locations to CSV

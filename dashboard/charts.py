@@ -312,9 +312,13 @@ def create_location_map(df, locations_df):
     # Flatten multi-level columns
     stats_df.columns = ['Event', 'RaceCount', 'BestTime', 'AvgTime', 'LatestDate']
 
-    # 2. Format times for display
-    stats_df['BestTimeFormatted'] = stats_df['BestTime'].apply(format_seconds_to_mmss)
-    stats_df['AvgTimeFormatted'] = stats_df['AvgTime'].apply(lambda x: format_seconds_to_mmss(int(x)))
+    # 2. Format times for display (handle NaN values)
+    stats_df['BestTimeFormatted'] = stats_df['BestTime'].apply(
+        lambda x: format_seconds_to_mmss(x) if pd.notna(x) else 'N/A'
+    )
+    stats_df['AvgTimeFormatted'] = stats_df['AvgTime'].apply(
+        lambda x: format_seconds_to_mmss(int(x)) if pd.notna(x) else 'N/A'
+    )
 
     # 3. Join with location coordinates
     map_df = stats_df.merge(locations_df, on='Event', how='left')
@@ -336,11 +340,27 @@ def create_location_map(df, locations_df):
     max_count = map_df['RaceCount'].max()
     map_df['MarkerSize'] = 10 + (map_df['RaceCount'] / max_count) * 20
 
-    # 6. Calculate map center
+    # 6. Assign consistent colors to each location (hash-based for consistency)
+    import hashlib
+    def get_color_for_event(event_name):
+        # Generate consistent color from event name hash
+        hash_value = int(hashlib.md5(event_name.encode()).hexdigest()[:8], 16)
+        # Use Plotly's Plotly color palette (24 distinct colors)
+        colors = [
+            '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b',
+            '#e377c2', '#7f7f7f', '#bcbd22', '#17becf', '#aec7e8', '#ffbb78',
+            '#98df8a', '#ff9896', '#c5b0d5', '#c49c94', '#f7b6d2', '#c7c7c7',
+            '#dbdb8d', '#9edae5', '#393b79', '#637939', '#8c6d31', '#843c39'
+        ]
+        return colors[hash_value % len(colors)]
+
+    map_df['MarkerColor'] = map_df['Event'].apply(get_color_for_event)
+
+    # 7. Calculate map center
     center_lat = map_df['Latitude'].mean()
     center_lon = map_df['Longitude'].mean()
 
-    # 7. Create Scattermapbox figure
+    # 8. Create Scattermapbox figure
     fig = go.Figure()
 
     fig.add_trace(go.Scattermapbox(
@@ -349,20 +369,8 @@ def create_location_map(df, locations_df):
         mode='markers',
         marker=dict(
             size=map_df['MarkerSize'],
-            color=map_df['AvgTime'],
-            colorscale='RdYlBu_r',  # Red=slow, Blue=fast
-            opacity=0.7,
-            line=dict(width=1, color='white'),
-            showscale=True,
-            colorbar=dict(
-                title='Avg Time',
-                tickvals=[map_df['AvgTime'].min(), map_df['AvgTime'].mean(), map_df['AvgTime'].max()],
-                ticktext=[
-                    format_seconds_to_mmss(int(map_df['AvgTime'].min())),
-                    format_seconds_to_mmss(int(map_df['AvgTime'].mean())),
-                    format_seconds_to_mmss(int(map_df['AvgTime'].max()))
-                ]
-            )
+            color=map_df['MarkerColor'],  # Fixed colors per location
+            opacity=0.8,  # Better balance of visibility and overlapping markers
         ),
         text=map_df['Event'],
         customdata=map_df[['RaceCount', 'BestTimeFormatted', 'AvgTimeFormatted', 'LatestDate']],
@@ -376,7 +384,7 @@ def create_location_map(df, locations_df):
         )
     ))
 
-    # 8. Configure map layout
+    # 9. Configure map layout
     fig.update_layout(
         title=dict(
             text='ParkRun Race Locations',
@@ -393,5 +401,10 @@ def create_location_map(df, locations_df):
         hovermode='closest'
     )
 
-    # Convert to HTML
-    return fig.to_html(full_html=False, include_plotlyjs='cdn')
+    # Convert to HTML with interactive config
+    config = {
+        'scrollZoom': True,  # Enable mouse wheel zoom
+        'displayModeBar': True,  # Show the toolbar
+        'displaylogo': False  # Hide Plotly logo
+    }
+    return fig.to_html(full_html=False, include_plotlyjs='cdn', config=config)

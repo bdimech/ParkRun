@@ -5,7 +5,7 @@
  * the results chart and location map using Plotly.js.
  */
 
-import { chooseTickInterval, calcYAxisBounds, calcXAxisBounds } from "./chart-utils.js?v=3";
+import { chooseTickInterval, calcYAxisBounds, calcXAxisBounds } from "./chart-utils.js?v=4";
 
 const DATA = {
     athletes:  "data/athletes.json",
@@ -336,7 +336,7 @@ function renderLocationMap(results, locations) {
         mapbox: {
             style: "open-street-map",
             center: { lat: -25.0, lon: 133.0 },
-            zoom: 4,
+            zoom: 3,
         },
         height: 600,
         margin: { l: 0, r: 0, t: 40, b: 0 },

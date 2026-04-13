@@ -5,6 +5,8 @@
  * the results chart and location map using Plotly.js.
  */
 
+import { chooseTickInterval, calcYAxisBounds, calcXAxisBounds } from "./chart-utils.js";
+
 const DATA = {
     athletes:  "data/athletes.json",
     results:   "data/results.json",
@@ -45,13 +47,6 @@ function hashColor(str, palette) {
         hash = Math.imul(hash, 31) + str.charCodeAt(i) | 0;
     }
     return palette[Math.abs(hash) % palette.length];
-}
-
-/** Return date string shifted by N months (ISO format). */
-function shiftMonth(isoDate, n) {
-    const d = new Date(isoDate);
-    d.setMonth(d.getMonth() + n);
-    return d.toISOString().split("T")[0];
 }
 
 /** Generate monthly tick dates between two ISO date strings (inclusive). */
@@ -184,24 +179,14 @@ function renderResultsChart(results) {
     // Axis ranges
     const allTimes = sorted.map(r => r.time_seconds);
     const allDates = sorted.map(r => r.run_date);
-    const xMin = shiftMonth(allDates[0], -1);
-    const xMax = shiftMonth(allDates[allDates.length - 1], 1);
-
-    const TICK = 60;
-    const yDataMin = Math.min(...allTimes);
-    const yDataMax = Math.max(...allTimes);
-    let yMin = Math.floor(yDataMin / TICK) * TICK - TICK;
-    let yMax = (Math.floor(yDataMax / TICK) + 1) * TICK + TICK;
-    yMin = Math.min(yMin, 20 * 60);
-    yMax = Math.max(yMax, 30 * 60);
+    const { xMin, xMax } = calcXAxisBounds(allDates);
+    const { yMin, yMax, tick } = calcYAxisBounds(allTimes);
 
     const yTicks = [];
-    for (let t = yMin; t <= yMax; t += TICK) yTicks.push(t);
+    for (let t = yMin; t <= yMax; t += tick) yTicks.push(t);
 
-    // Monthly grid lines
-    const goldenEnd = "2026-06-30";
-    const lineEnd = xMax > goldenEnd ? xMax : goldenEnd;
-    const shapes = monthlyDates(xMin, lineEnd).map(d => ({
+    // Monthly grid lines spanning only the actual data range
+    const shapes = monthlyDates(xMin, xMax).map(d => ({
         type: "line", x0: d, x1: d, y0: 0, y1: 1, yref: "paper",
         line: { color: "lightgray", width: 1, dash: "dot" }
     }));

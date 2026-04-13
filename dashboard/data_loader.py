@@ -296,6 +296,35 @@ def load_location_data(csv_path='data/parkrun_locations.csv'):
     return pd.read_csv(csv_path)
 
 
+def build_url_slug(event_name: str) -> str:
+    """Convert an event name to a parkrun URL slug (lowercase, no spaces or commas)."""
+    raise NotImplementedError
+
+
+def extract_coordinates(html: str):
+    """
+    Parse a geo.position meta tag from HTML and return (latitude, longitude).
+    Returns None if the tag is missing or malformed.
+    """
+    raise NotImplementedError
+
+
+def geocode_single_event(event: str, fetch_fn, prompt_fn, confirm_fn):
+    """
+    Attempt to geocode a single event, with fallback prompts.
+
+    Args:
+        event:      Event name (e.g. "Largs Bay")
+        fetch_fn:   fn(url) -> (status_code, html)
+        prompt_fn:  fn(message) -> str  (user input for manual URL, or "")
+        confirm_fn: fn(message) -> bool (user confirms UK fallback)
+
+    Returns:
+        (latitude, longitude) tuple, or None if all attempts fail.
+    """
+    raise NotImplementedError
+
+
 def geocode_new_locations(results_df, locations_csv='data/parkrun_locations.csv'):
     """
     Geocode any new event locations found in results that aren't in locations file.

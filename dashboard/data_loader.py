@@ -298,7 +298,7 @@ def load_location_data(csv_path='data/parkrun_locations.csv'):
 
 def build_url_slug(event_name: str) -> str:
     """Convert an event name to a parkrun URL slug (lowercase, no spaces or commas)."""
-    raise NotImplementedError
+    return event_name.lower().replace(' ', '').replace(',', '')
 
 
 def extract_coordinates(html: str):
@@ -306,7 +306,18 @@ def extract_coordinates(html: str):
     Parse a geo.position meta tag from HTML and return (latitude, longitude).
     Returns None if the tag is missing or malformed.
     """
-    raise NotImplementedError
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html, 'html.parser')
+    geo_tag = soup.find('meta', attrs={'name': 'geo.position'})
+    if not geo_tag or not geo_tag.get('content'):
+        return None
+    try:
+        parts = geo_tag['content'].split(';')
+        if len(parts) != 2:
+            return None
+        return (float(parts[0]), float(parts[1]))
+    except (ValueError, IndexError):
+        return None
 
 
 def geocode_single_event(event: str, fetch_fn, prompt_fn, confirm_fn):
@@ -322,7 +333,33 @@ def geocode_single_event(event: str, fetch_fn, prompt_fn, confirm_fn):
     Returns:
         (latitude, longitude) tuple, or None if all attempts fail.
     """
-    raise NotImplementedError
+    slug = build_url_slug(event)
+    au_url = f"https://www.parkrun.com.au/{slug}/"
+
+    status, html = fetch_fn(au_url)
+
+    if status == 200:
+        return extract_coordinates(html)
+
+    # .com.au failed — ask for a manual URL
+    manual_url = prompt_fn(
+        f'Could not find "{event}" on parkrun.com.au. Enter URL (or press Enter to skip): '
+    ).strip()
+
+    if manual_url:
+        status, html = fetch_fn(manual_url)
+        if status == 200:
+            return extract_coordinates(html)
+        return None
+
+    # User skipped — offer UK fallback as last resort
+    if confirm_fn(f'Try UK parkrun (parkrun.org.uk) for "{event}"? [y/N]: '):
+        uk_url = f"https://www.parkrun.org.uk/{slug}/"
+        status, html = fetch_fn(uk_url)
+        if status == 200:
+            return extract_coordinates(html)
+
+    return None
 
 
 def geocode_new_locations(results_df, locations_csv='data/parkrun_locations.csv'):
@@ -358,60 +395,44 @@ def geocode_new_locations(results_df, locations_csv='data/parkrun_locations.csv'
 
     logger.info(f"Geocoding {len(new_events)} new locations: {new_events}")
 
-    # 4. Geocode new events by scraping parkrun website
     import requests
-    from bs4 import BeautifulSoup
     import time
+
+    HTTP_HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+
+    def fetch_fn(url):
+        try:
+            response = requests.get(url, headers=HTTP_HEADERS, timeout=10)
+            return response.status_code, response.text
+        except requests.RequestException as e:
+            logger.error(f"Network error fetching {url}: {e}")
+            return 0, ""
+
+    def prompt_fn(msg):
+        return input(msg)
+
+    def confirm_fn(msg):
+        return input(msg).strip().lower() == 'y'
 
     new_rows = []
 
     for event in new_events:
         try:
-            # Convert event name to parkrun URL slug (lowercase, remove spaces and commas)
-            url_slug = event.lower().replace(' ', '').replace(',', '')
-            parkrun_url = f"https://www.parkrun.com.au/{url_slug}/"
-
-            # Fetch the parkrun page
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-            response = requests.get(parkrun_url, headers=headers, timeout=10)
-
-            if response.status_code == 200:
-                # Parse HTML to find geo.position meta tag
-                soup = BeautifulSoup(response.text, 'html.parser')
-                geo_tag = soup.find('meta', attrs={'name': 'geo.position'})
-
-                if geo_tag and geo_tag.get('content'):
-                    # Extract coordinates (format: "latitude;longitude")
-                    coords = geo_tag['content'].split(';')
-                    if len(coords) == 2:
-                        latitude = float(coords[0])
-                        longitude = float(coords[1])
-
-                        new_rows.append({
-                            'Event': event,
-                            'Latitude': latitude,
-                            'Longitude': longitude,
-                            'State': ''  # Can be filled manually later
-                        })
-                        logger.info(f"Geocoded {event}: ({latitude}, {longitude})")
-                    else:
-                        logger.warning(f"Could not parse coordinates for: {event}")
-                else:
-                    logger.warning(f"No geo.position meta tag found for: {event}")
+            coords = geocode_single_event(event, fetch_fn, prompt_fn, confirm_fn)
+            if coords:
+                latitude, longitude = coords
+                new_rows.append({
+                    'Event': event,
+                    'Latitude': latitude,
+                    'Longitude': longitude,
+                    'State': ''
+                })
+                logger.info(f"Geocoded {event}: ({latitude}, {longitude})")
             else:
-                logger.warning(f"Failed to fetch parkrun page for {event} (status: {response.status_code})")
+                logger.warning(f"Could not geocode {event} — skipping.")
 
-            # Rate limit: wait 1 second between requests (be nice to parkrun.com)
             time.sleep(1)
 
-        except requests.RequestException as e:
-            logger.error(f"Network error fetching coordinates for {event}: {e}")
-            continue
-        except (ValueError, IndexError) as e:
-            logger.error(f"Error parsing coordinates for {event}: {e}")
-            continue
         except Exception as e:
             logger.error(f"Unexpected error geocoding {event}: {e}")
             continue

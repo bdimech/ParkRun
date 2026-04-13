@@ -5,7 +5,7 @@
  * the results chart and location map using Plotly.js.
  */
 
-import { chooseTickInterval, calcYAxisBounds, calcXAxisBounds } from "./chart-utils.js";
+import { chooseTickInterval, calcYAxisBounds, calcXAxisBounds } from "./chart-utils.js?v=2";
 
 const DATA = {
     athletes:  "data/athletes.json",

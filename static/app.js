@@ -5,7 +5,7 @@
  * the results chart and location map using Plotly.js.
  */
 
-import { chooseTickInterval, calcYAxisBounds, calcXAxisBounds } from "./chart-utils.js?v=2";
+import { chooseTickInterval, calcYAxisBounds, calcXAxisBounds } from "./chart-utils.js?v=3";
 
 const DATA = {
     athletes:  "data/athletes.json",
@@ -335,9 +335,8 @@ function renderLocationMap(results, locations) {
         title: { text: "ParkRun Race Locations", x: 0.5, xanchor: "center" },
         mapbox: {
             style: "open-street-map",
-            center: { lat: lats.reduce((a, b) => a + b) / lats.length,
-                      lon: lons.reduce((a, b) => a + b) / lons.length },
-            zoom: 5,
+            center: { lat: -25.0, lon: 133.0 },
+            zoom: 4,
         },
         height: 600,
         margin: { l: 0, r: 0, t: 40, b: 0 },

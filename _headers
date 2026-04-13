@@ -1,11 +1,11 @@
-# JS and CSS: cache for 1 hour, revalidate on each deploy
+# JS and CSS: always revalidate against server (ETag check), re-download only if changed
 /static/*.js
-  Cache-Control: public, max-age=3600
+  Cache-Control: no-cache
 
 /static/*.css
-  Cache-Control: public, max-age=3600
+  Cache-Control: no-cache
 
-# JSON data: cache for 1 hour
+# JSON data: cache for 1 hour (changes only on manual push)
 /data/*
   Cache-Control: public, max-age=3600
 

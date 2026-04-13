@@ -16,7 +16,11 @@
  * @returns {number} tick interval in seconds
  */
 export function chooseTickInterval(rangeSeconds) {
-    throw new Error("Not implemented");
+    const mins = rangeSeconds / 60;
+    if (mins <= 15) return 1 * 60;
+    if (mins <= 30) return 2 * 60;
+    if (mins <= 60) return 5 * 60;
+    return 10 * 60;
 }
 
 /**
@@ -27,7 +31,14 @@ export function chooseTickInterval(rangeSeconds) {
  * @returns {{ yMin: number, yMax: number, tick: number }}
  */
 export function calcYAxisBounds(timesInSeconds) {
-    throw new Error("Not implemented");
+    const minTime = Math.min(...timesInSeconds);
+    const maxTime = Math.max(...timesInSeconds);
+    const tick = chooseTickInterval(maxTime - minTime);
+
+    const yMin = Math.max(0, Math.floor(minTime / tick) * tick - tick);
+    const yMax = (Math.floor(maxTime / tick) + 1) * tick + tick;
+
+    return { yMin, yMax, tick };
 }
 
 /**
@@ -38,5 +49,14 @@ export function calcYAxisBounds(timesInSeconds) {
  * @returns {{ xMin: string, xMax: string }}
  */
 export function calcXAxisBounds(isoDates) {
-    throw new Error("Not implemented");
+    const sorted = [...isoDates].sort();
+    const pad = (iso, months) => {
+        const d = new Date(iso);
+        d.setMonth(d.getMonth() + months);
+        return d.toISOString().split("T")[0];
+    };
+    return {
+        xMin: pad(sorted[0], -1),
+        xMax: pad(sorted[sorted.length - 1], 1),
+    };
 }

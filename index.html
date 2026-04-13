@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ParkRun Dashboard</title>
+    <link rel="stylesheet" href="static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="dashboard-header">
+            <h1>ParkRun Dashboard</h1>
+
+            <div class="athlete-selector">
+                <label for="athlete-select">Select Athlete:</label>
+                <select id="athlete-select">
+                    <option>Loading...</option>
+                </select>
+            </div>
+
+            <h2 id="athlete-heading">Loading...</h2>
+        </header>
+
+        <div class="dashboard-content">
+            <div class="chart-container" id="chart-container">
+                <div class="no-results">Loading chart...</div>
+            </div>
+
+            <div class="map-container" id="map-container">
+                <div class="no-results">Loading map...</div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <script src="static/app.js"></script>
+</body>
+</html>

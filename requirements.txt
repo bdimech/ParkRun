@@ -1,7 +1,4 @@
-flask
 pandas
 requests
-matplotlib
 beautifulsoup4
-plotly
 geopy>=2.3.0

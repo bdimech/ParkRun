@@ -112,7 +112,7 @@ def export_all(data_dir: str = "data", output_dir: str = None) -> None:
     for filename, records in files.items():
         path = os.path.join(output_dir, filename)
         with open(path, "w", encoding="utf-8") as f:
-            json.dump(records, f, indent=2)
+            json.dump(records, f, separators=(",", ":"))
         print(f"Wrote {len(records)} records to {path}")
 
 
